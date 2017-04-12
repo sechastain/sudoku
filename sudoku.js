@@ -20,7 +20,6 @@ var cell = function(r, c) {
         col : c,
         val : null,
         possible : range(10, 1),
-        groups : []
     };
 };
 
@@ -31,39 +30,20 @@ range(9).forEach(function(r) {
     });
 });
 
-// build our rows
 var rows = [];
-range(9).forEach(function(r) {
-    var row = board.filter(function(cell) {
-        return cell.row === r;
-    });
-    row.forEach(function(cell) {
-        cell.groups.push(row);
-    });
-    rows.push(row);
-});
-
-// build our columns
 var cols = [];
-range(9).forEach(function(c) {
-    var col = board.filter(function(cell) {
-        return cell.col === c;
-    });
-    col.forEach(function(cell) {
-        cell.groups.push(col);
-    });
-    cols.push(col);
-});
-
-// build our squares
 var sqrs = [];
 range(9).forEach(function(s) {
+    rows.push([]);
+    cols.push([]);
     sqrs.push([]);
 });
 board.forEach(function(cell) {
     var s = Math.floor(cell.row / 3) * 3 + Math.floor(cell.col / 3);
+    rows[cell.row].push(cell);
+    cols[cell.col].push(cell);
     sqrs[s].push(cell);
-    cell.groups.push(sqrs[s]);
+    cell.groups = [rows[cell.row], cols[cell.col], sqrs[s]];
 });
 
 var removed = false;
