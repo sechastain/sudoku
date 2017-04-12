@@ -1,46 +1,61 @@
 
+var fs = require('fs');
+
 var board = [];
 
-var range = function(max, min) {
+// create a list of values from min (inclusive) to upper (exclusive)
+var range = function(upper, min) {
     var arr = [];
     var i = min ? min : 0;
-    for(; i < max; i++) {
+    for(; i < upper; i++) {
         arr.push(i);
     }
     return arr;
 };
 
+// build a new cell
 var cell = function(r, c) {
     return {
         row : r,
         col : c,
         val : null,
-        possible : range(10, 1)
+        possible : range(10, 1),
+        groups : []
     };
 };
 
+// build the board
 range(9).forEach(function(r) {
     range(9).forEach(function(c) {
         board.push(cell(r, c));
     });
 });
 
+// build our rows
 var rows = [];
 range(9).forEach(function(r) {
     var row = board.filter(function(cell) {
         return cell.row === r;
     });
+    row.forEach(function(cell) {
+        cell.groups.push(row);
+    });
     rows.push(row);
 });
 
+// build our columns
 var cols = [];
 range(9).forEach(function(c) {
     var col = board.filter(function(cell) {
         return cell.col === c;
     });
+    col.forEach(function(cell) {
+        cell.groups.push(col);
+    });
     cols.push(col);
 });
 
+// build our squares
 var sqrs = [];
 range(9).forEach(function(s) {
     sqrs.push([]);
@@ -48,9 +63,14 @@ range(9).forEach(function(s) {
 board.forEach(function(cell) {
     var s = Math.floor(cell.row / 3) * 3 + Math.floor(cell.col / 3);
     sqrs[s].push(cell);
+    cell.groups.push(sqrs[s]);
 });
 
+var removed = false;
+
+// remove val from the possible list of each cell in the group
 var remove = function(grp, val) {
+    removed = true;
     grp.forEach(function(cell) {
         var i = cell.possible.indexOf(val);
         if(i >= 0) {
@@ -59,23 +79,29 @@ var remove = function(grp, val) {
     });
 };
 
-var solo = function(grp) {
+// look to see if the list of possibilities for any cell in a group is 1
+// if so, set the value of the cell and remove the value from the 
+// list of possible values in the cells in groups related to the cell
+var found = function(grp) {
     grp.forEach(function(cell) {
-        if(cell.val) { // && cell.possible.length > 0) {
-            cell.possible = [];
-            remove(grp, cell.val);
-        } else if(cell.possible.length === 1) {
+        if(cell.possible.length === 1) {
             cell.val = cell.possible[0];
             cell.possible.splice(0, 1);
-            remove(grp, cell.val);
+            cell.groups.forEach(function(g) {
+                remove(g, cell.val);
+            });
         }
     });
 };
 
-var uniq = function(grp) {
-    var uni = {};
+// look for possible values unique to a cell
+var unique_possibilities = function(grp) {
+    var unique = {};
     var non = {};
     var unsolved = [];
+
+    // build our list of unsolved cells and
+    // our map of non-unique (found) values
     grp.forEach(function(c) {
         if(c.val === null) {
             unsolved.push(c);
@@ -83,34 +109,50 @@ var uniq = function(grp) {
             non[c.val] = c;
         }
     });
+
     unsolved.forEach(function(c) {
+        //for each possible value in each unsolved cell
         c.possible.forEach(function(v) {
+            // if the value is already non-unique ignore it
+            // however, if it's not flagged non-unique yet
             if(!non[v]) {
-                if(!uni[v]) {
-                    uni[v] = c;
+                // if the value is not flagged as unique yet, flag it
+                if(!unique[v]) {
+                    unique[v] = c;
+                // else remove it from the list of flagged unique 
+                // possible values
                 } else {
-                    delete uni[v];
+                    delete unique[v];
                     non[v] = c;
                 }
             }
         });
     });
-    var keys = Object.keys(uni).map(function(v) {
+
+    // so now unique is a map of possible values unique to a particular cell
+    // we need to get the values
+    var keys = Object.keys(unique).map(function(v) {
         return parseInt(v);
     });
+
+    // for any unique value, we create a temporary list in the affected cell.
+    // the temporary list could end up holding multiple unique values
     keys.forEach(function(u) {
-        uni[u].pot = [];
-    });
-    keys.forEach(function(u) {
-        uni[u].pot.push(u);
-    });
-    keys.forEach(function(u) {
-        if(uni[u].pot) {
-            uni[u].possible = uni[u].pot;
-            delete uni[u].pot;
+        if(unique[u].potential) {
+            unique[u].potential.push(u);
+        } else {
+            unique[u].potential = [u];
         }
     });
-    solo(grp);
+
+    // make the temporary list the new list of possible values for 
+    // affected cells.  delete the temporary list
+    keys.forEach(function(u) {
+        if(unique[u].potential) {
+            unique[u].possible = unique[u].potential;
+            delete unique[u].potential;
+        }
+    });
 };
 
 var solved = function(grp) {
@@ -119,7 +161,7 @@ var solved = function(grp) {
     });
 };
 
-var print = function() {
+var print = function(poss) {
     console.log('-----------------');
     rows.forEach(function(r) {
         var p = r.map(function(c) {
@@ -127,91 +169,47 @@ var print = function() {
         });
         console.log(p);
     });
+    if(poss) {
+        board.forEach(function(c) {
+            if(!c.val) {
+                delete c.groups;
+                console.log(c);
+            }
+        });
+    }
 }
 
-/*
-board[0].val = 7;
-board[1].val = 9;
-board[6].val = 3;
-board[14].val = 6;
-board[15].val = 9;
-board[18].val = 8;
-board[22].val = 3;
-board[25].val = 7;
-board[26].val = 6;
-board[32].val = 5;
-board[35].val = 2;
-board[38].val = 5;
-board[39].val = 4;
-board[40].val = 1;
-board[41].val = 8;
-board[42].val = 7;
-board[45].val = 4;
-board[48].val = 7;
-board[54].val = 6;
-board[55].val = 1;
-board[58].val = 9;
-board[62].val = 8;
-board[65].val = 2;
-board[66].val = 3;
-board[74].val = 9;
-board[79].val = 5;
-board[80].val = 4;
-*/
+var file = fs.readFileSync(process.argv[2], 'utf8');
 
-/*
-board[5].val = 7;
-board[11].val = 2;
-board[12].val = 4;
-board[14].val = 6;
-board[15].val = 3;
-board[19].val = 1;
-board[20].val = 7;
-board[24].val = 9;
-board[25].val = 6;
-board[27].val = 5;
-board[28].val = 8;
-board[34].val = 3;
-board[40].val = 9;
-board[46].val = 7;
-board[52].val = 4;
-board[53].val = 2;
-board[55].val = 9;
-board[56].val = 4;
-board[60].val = 6;
-board[61].val = 5;
-board[65].val = 5;
-board[66].val = 2;
-board[68].val = 8;
-board[69].val = 1;
-board[75].val = 5;
-*/
+console.log(file);
 
-board[0].val = 2;
-board[3].val = 5;
-board[7].val = 8;
-board[11].val = 1;
-board[13].val = 2;
-board[28].val = 7;
-board[32].val = 8;
-board[38].val = 3;
-board[43].val = 2;
-board[49].val = 7;
-board[51].val = 6;
-board[54].val = 6;
-board[57].val = 2;
-board[62].val = 1;
-board[64].val = 4;
-board[69].val = 7;
-board[75].val = 3;
+file.split('\n').forEach(function(l, r) {
+    l.split('').forEach(function(v, c) {
+        v = parseInt(v);
+        if(v > 0 && v < 10 && r >=0 && r < 9 && c >= 0 && c < 9) {
+            var cell = board[r * 9 + c];
+            cell.val = v;
+            cell.possible = [];
+            cell.groups.forEach(function(g) {
+                remove(g, cell.val);
+            });
+        }
+    });
+});
 
+var colls = [rows, cols, sqrs];
+
+print();
 while(!solved(board)) {
-//    rows.forEach(solo);
-//    cols.forEach(solo);
-//    sqrs.forEach(solo);
-    rows.forEach(uniq);
-    cols.forEach(uniq);
-    sqrs.forEach(uniq);
-
-    print();
+    removed = false;
+    colls.forEach(function(coll) {
+        coll.forEach(function(group) {
+            unique_possibilities(group);
+        });
+    });
+    found(board);
+    print(!removed);
+    if(!removed) {
+        break;
+    }
 }
